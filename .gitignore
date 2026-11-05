@@ -10,3 +10,6 @@ book_cache/
 # Python
 __pycache__/
 *.pyc
+
+# Local test files (assignment copies); never commit
+__test__/

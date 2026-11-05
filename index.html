@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HW Formatter</title>
+<meta name="description" content="Turn a homework PDF into one engineering-paper page per problem, with the header filled in. Runs in your browser; files never leave your device.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='2' width='26' height='28' rx='2' fill='%23fff' stroke='%231b741d' stroke-width='2'/%3E%3Cpath d='M3 9h26M9 2v28M15 9v21M21 9v21M9 15h20M9 21h20' stroke='%231b741d' stroke-width='1' opacity='.6'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="web/style.css">
+<script type="module" src="web/app.js"></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand">HW Formatter</div>
+  <label class="btn primary" id="openLbl" aria-disabled="true">Open PDF…<input type="file" id="openInput" accept="application/pdf,.pdf" hidden disabled></label>
+  <span id="fileName" class="filename">No file open</span>
+  <div class="fields">
+    <label>Name <input id="fName" size="15" autocomplete="name"></label>
+    <label>Class <input id="fCls" size="7"></label>
+    <label>HW <input id="fHw" size="7"></label>
+    <label>Date <input id="fDate" size="10"></label>
+    <label class="check"><input type="checkbox" id="fPnum"> Problem # in header</label>
+  </div>
+  <div class="actions">
+    <button id="exportPdf" class="primary" disabled>Export PDF</button>
+    <button id="exportZip" disabled title="Each problem as a picture, in a .zip">PNGs (.zip)</button>
+    <button id="settingsBtn">Settings</button>
+    <button id="helpBtn">Help</button>
+  </div>
+</header>
+
+<div id="status" class="status">Loading the PDF engine…</div>
+<div id="banner" class="banner" hidden></div>
+
+<main>
+  <aside class="side">
+    <section class="panel">
+      <h2>Problems <span class="muted">(one per page)</span></h2>
+      <ol id="list" class="list"></ol>
+      <div class="btns">
+        <button id="moveUp" disabled>Move up</button>
+        <button id="moveDown" disabled>Move down</button>
+        <button id="merge" disabled>Merge with next</button>
+        <button id="del" disabled>Delete</button>
+        <button id="pngOne" disabled title="This problem as a picture">Save PNG</button>
+      </div>
+    </section>
+    <section class="panel">
+      <h2>Problem size <span id="scaleLbl" class="muted"></span></h2>
+      <input type="range" id="scale" min="40" max="130" step="1" value="75" disabled aria-label="Problem size">
+      <div class="btns"><button id="scaleAll" disabled>Use this size for all</button></div>
+    </section>
+    <section class="panel">
+      <h2>Fix a crop</h2>
+      <p class="hint">Drag a box on the original page, then:</p>
+      <div class="btns">
+        <button id="boxReplace" disabled>Replace crop with box</button>
+        <button id="boxAdd" disabled>Add box to this problem</button>
+        <button id="boxNew" disabled>New problem from box</button>
+      </div>
+    </section>
+  </aside>
+
+  <section class="view">
+    <div class="viewhead">
+      <button id="prevPage" aria-label="Previous page" disabled>‹</button>
+      <span id="pageLbl">Original</span>
+      <button id="nextPage" aria-label="Next page" disabled>›</button>
+    </div>
+    <div class="pagewrap" id="srcWrap">
+      <canvas id="srcCanvas"></canvas>
+      <canvas id="srcOverlay" class="overlay"></canvas>
+      <div id="srcEmpty" class="empty">Open a homework PDF, or drop one anywhere on this page.</div>
+    </div>
+  </section>
+
+  <section class="view">
+    <div class="viewhead"><span id="outLbl">Output preview</span></div>
+    <div class="pagewrap" id="outWrap">
+      <canvas id="outCanvas"></canvas>
+      <div id="outEmpty" class="empty">The formatted page shows here.</div>
+    </div>
+  </section>
+</main>
+
+<dialog id="settingsDlg">
+  <form method="dialog" class="dlg">
+    <h2>Settings</h2>
+
+    <h3>Textbooks</h3>
+    <p class="hint">When an assignment lists textbook problems (like "FPE 5.4"), each one is cropped from the textbook PDF. Textbooks are saved in this browser on this device only; nothing is uploaded.</p>
+    <table class="books">
+      <thead><tr><th>Prefix</th><th>Textbook</th><th>File</th><th></th></tr></thead>
+      <tbody id="bookRows"></tbody>
+    </table>
+    <fieldset class="addbook">
+      <legend>Add a textbook</legend>
+      <label>Prefix <input id="bkPrefix" size="6" placeholder="FPE" autocapitalize="characters"></label>
+      <label class="grow">Title <input id="bkTitle" placeholder="Feedback Control of Dynamic Systems, 8th ed."></label>
+      <label class="btn">Choose PDF…<input type="file" id="bkFile" accept="application/pdf,.pdf" hidden></label>
+    </fieldset>
+    <p class="hint">The prefix is what your class writes before the problem number. The first time a textbook is used it's indexed (a few seconds to a minute); after that it's instant.</p>
+
+    <h3>Problem headings</h3>
+    <p class="hint">For assignments that aren't textbook lists: a line starting with one of these begins a new problem. One regular expression per line. Used the next time you open a PDF.</p>
+    <textarea id="headings" rows="3" spellcheck="false"></textarea>
+
+    <h3>Pictures</h3>
+    <label>PNG resolution <input id="dpi" type="number" min="72" max="600" step="10" size="5"> dpi</label>
+
+    <div class="dlgbtns">
+      <button id="resetSettings" type="button">Reset settings</button>
+      <button value="close" class="primary">Done</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="helpDlg">
+  <form method="dialog" class="dlg">
+    <h2>How to use HW Formatter</h2>
+    <ol>
+      <li><b>Open PDF…</b> (or drop the homework PDF on the page). Each problem is cropped and placed at the top of a sheet of engineering paper.</li>
+      <li>Check the problem list. The red box on the original page shows what was cropped.</li>
+      <li>Fill in or fix Name, Class, HW and Date. Untick <b>Problem # in header</b> to drop "P1".</li>
+      <li><b>Export PDF</b> gives one page per problem (more if a problem is long). <b>PNGs (.zip)</b> or <b>Save PNG</b> gives the problems as pictures you can move and resize, e.g. in Samsung Notes.</li>
+    </ol>
+    <h3>Fixing things</h3>
+    <ul>
+      <li><b>Bigger/smaller:</b> drag <b>Problem size</b>; <b>Use this size for all</b> applies it everywhere.</li>
+      <li><b>Wrong crop:</b> drag a box on the original page, then <b>Replace crop with box</b>. Use ‹ › to change pages.</li>
+      <li><b>Add a piece from another page:</b> drag a box, then <b>Add box to this problem</b>.</li>
+      <li><b>Split a problem:</b> replace the crop with the first part, drag a box around the second part, then <b>New problem from box</b>.</li>
+      <li><b>Join or remove:</b> <b>Merge with next</b>, <b>Delete</b>.</li>
+    </ul>
+    <h3>Detection</h3>
+    <p>A problem starts at a line like <code>HW#3.1</code>, <code>Problem 4</code> or <code>Question 2</code> (change these in Settings). If none are found, each page is one problem. Scanned PDFs (no selectable text) become one problem per page; draw the boxes yourself.</p>
+    <p>If the assignment lists textbook problems (<code>1. FPE 5.26</code>), add that textbook in <b>Settings</b> once and each problem is pulled from the book, under the assignment's own note for it. Anything after a line containing "optional" is skipped.</p>
+    <h3>Privacy</h3>
+    <p>Everything runs in your browser. Your PDFs are never uploaded. Name and settings are saved in this browser only.</p>
+    <p class="muted">Open source (MIT): <a href="https://github.com/justinsprangers/HWFormatter">github.com/justinsprangers/HWFormatter</a>. PDF engine: <a href="https://mupdf.com/">MuPDF.js</a> (AGPL).</p>
+    <div class="dlgbtns"><button value="close" class="primary">Close</button></div>
+  </form>
+</dialog>
+</body>
+</html>

@@ -166,6 +166,9 @@ def _book_problems(doc, refs, scale, progress):
     for ref in refs:
         segs = [(doc, *ref["block"])]
         title = ref["label"]
+        if not ref["prefix"]:  # numbered item with no textbook reference
+            problems.append(Problem(title, ref["number"], segs, scale))
+            continue
         pdf = books[ref["prefix"]]["pdf"]
         if not os.path.exists(pdf):
             title += "  (textbook PDF missing)"

@@ -171,6 +171,7 @@ def find_refs(doc, books):
         return []
     prefixes = "|".join(re.escape(p) for p in books)
     ref_re = re.compile(r"^\s*(?:(\d+)\s*[.)]\s*)?(" + prefixes + r")\s*(\d+\.\d+)")
+    item_re = re.compile(r"^\s*(\d+)\s*[.)]\s+\S")  # "4. This problem builds on..."
     refs, stop = [], False
     for pi, page in enumerate(doc):
         if stop:
@@ -181,7 +182,15 @@ def find_refs(doc, books):
                 stop = True
                 break
             m = ref_re.match(text)
-            if m:
+            n = None if m else item_re.match(text)
+            # A numbered item that cites no book is its own problem (assignment
+            # text only), but only if it's the next number, so numbered notes
+            # inside an item don't split it.
+            if n and int(n.group(1)) == (_num(refs[-1]) + 1 if refs else 1):
+                refs.append({"prefix": None, "key": None, "number": n.group(1),
+                             "label": f"Problem {n.group(1)}",
+                             "block": [pi, fitz.Rect(rect)]})
+            elif m:
                 refs.append({"prefix": m.group(2), "key": m.group(3),
                              "number": m.group(1) or str(len(refs) + 1),
                              "label": f"{m.group(2)} {m.group(3)}",
@@ -189,7 +198,16 @@ def find_refs(doc, books):
             elif refs and refs[-1]["block"][0] == pi and not (
                     rect.y0 > page.rect.height * 0.9 and re.match(r"^\s*(page\s*)?\d+(\s*of\s*\d+)?\s*$", text, re.I)):
                 refs[-1]["block"][1] |= rect  # notes under the reference line
+    if not any(r["prefix"] for r in refs):
+        return []
     for r in refs:
         pi, rect = r["block"]
         r["block"] = (pi, fitz.Rect(rect.x0 - PAD, rect.y0 - PAD, rect.x1 + PAD, rect.y1 + PAD) & doc[pi].rect)
     return refs
+
+
+def _num(ref):
+    try:
+        return int(ref["number"])
+    except ValueError:
+        return -1

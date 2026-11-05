@@ -1,0 +1,12 @@
+# Personal settings (your name, last class), created on first export
+settings.json
+
+# Your textbook list (local PDF paths). Copy books.example.json to start one.
+books.json
+
+# Textbook index cache (rebuilt automatically)
+book_cache/
+
+# Python
+__pycache__/
+*.pyc
